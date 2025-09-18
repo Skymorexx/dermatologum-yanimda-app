@@ -1,0 +1,18 @@
+name: Remind Appointments (every 5 min)
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # her 5 dakikada bir (UTC)
+  workflow_dispatch:        # elle çalıştırma için
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke Supabase Edge Function
+        run: |
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}" \
+            -d '{}' \
+            "${{ vars.SUPA_FN_URL }}"
