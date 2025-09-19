@@ -1,47 +1,43 @@
-name: Remind Appointments
+# .github/workflows/remind-appointments.yml
+name: Remind Appointments (every 5 min)
 
 on:
-schedule:
-- cron: "*/5 * * * *"
-workflow_dispatch:
-
-env:
-SUPA_FN_URL: ${{ vars.SUPA_FN_URL }}
-CRON_SECRET: ${{ secrets.CRON_SECRET }}
+  schedule:
+    - cron: "*/5 * * * *"   # her 5 dakikada bir (UTC)
+  workflow_dispatch:        # elle tetiklemek için
 
 jobs:
-trigger-reminder:
-runs-on: ubuntu-latest
-steps:
-- name: Invoke remind-appointments function
-run: |
-set -eo pipefail
-if [ -z "${SUPA_FN_URL:-}" ]; then
-echo "Environment variable SUPA_FN_URL is not set." >&2
-exit 1
-fi
-if [ -z "${CRON_SECRET:-}" ]; then
-echo "Secret CRON_SECRET is not set." >&2
-exit 1
-fi
-response_file="remind-appointments-response.json"
-url="${SUPA_FN_URL%/}/remind-appointments?key=${CRON_SECRET}"
-status=$(curl -sS -o "$response_file" -w "%{http_code}"
--X POST "$url"
--H "Content-Type: application/json"
--d '{}')
-echo "HTTP status: $status"
-echo "Response body:"
-cat "$response_file"
-echo "Response saved to $response_file"
-{
-echo "## remind-appointments invocation"
-echo ""
-echo "- HTTP status: $status"
-echo ""
-echo "Response body:"
-echo 'json' cat "$response_file" echo ''
-} >> "$GITHUB_STEP_SUMMARY"
-if [ "$status" -ne 200 ]; then
-exit 1
-fi
+  trigger-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke Supabase Edge Function and print response
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ vars.SUPA_FN_URL }}?key=${{ secrets.CRON_SECRET }}"
+          echo "POST $URL"
+
+          HTTP_STATUS=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            -o /tmp/res.json \
+            -w '%{http_code}' \
+            "$URL")
+
+          echo "HTTP_STATUS=$HTTP_STATUS"
+          echo "Response body:"
+          cat /tmp/res.json
+
+          {
+            echo "### remind-appointments response"
+            echo
+            echo "**HTTP:** $HTTP_STATUS"
+            echo
+            echo '```json'
+            cat /tmp/res.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            exit 1
+          fi
