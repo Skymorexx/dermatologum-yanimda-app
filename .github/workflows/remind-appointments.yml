@@ -9,10 +9,25 @@ jobs:
   call:
     runs-on: ubuntu-latest
     steps:
-      - name: Invoke Supabase Edge Function
-        run: |
-          curl -sS -X POST \
-            -H "Content-Type: application/json" \
-            -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}" \
-            -d '{}' \
-            "${{ vars.SUPA_FN_URL }}"
+      - name: Invoke Supabase Edge Function and print response
+  shell: bash
+  run: |
+    set -e
+    URL="${{ vars.SUPA_FN_URL }}?key=${{ secrets.CRON_SECRET }}"
+    echo "POST $URL"
+    HTTP_STATUS=$(curl -sS -X POST \
+      -H "Content-Type: application/json" \
+      -d '{}' \
+      -o /tmp/res.json \
+      -w '%{http_code}' \
+      "$URL")
+    echo "HTTP_STATUS=$HTTP_STATUS"
+    echo "Response body:"; cat /tmp/res.json
+    {
+      echo "### remind-appointments response"
+      echo ""
+      echo "**HTTP:** $HTTP_STATUS"
+      echo ""
+      echo '```json'; cat /tmp/res.json; echo '```'
+    } >> "$GITHUB_STEP_SUMMARY"
+    [ "$HTTP_STATUS" = "200" ]
